@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Effect of Precision on PDE Solvers — IISc DS 289</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#0a0e1a; --bg2:#111827; --bg3:#1f2937;
+      --border:#1e3a5f; --border2:#2563eb33;
+      --blue:#3b82f6; --blue2:#60a5fa; --blue3:#1d4ed8;
+      --cyan:#06b6d4; --purple:#8b5cf6; --green:#10b981;
+      --red:#ef4444; --amber:#f59e0b;
+      --text:#f1f5f9; --text2:#94a3b8; --text3:#64748b;
+      --shadow:0 4px 24px rgba(59,130,246,0.12);
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+    html{scroll-behavior:smooth;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.7;overflow-x:hidden;}
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-thumb{background:var(--blue);border-radius:2px;}
+
+    /* HERO */
+    .hero{
+      min-height:100vh;display:flex;align-items:center;
+      background:radial-gradient(ellipse at 20% 50%,rgba(37,99,235,0.15) 0%,transparent 60%),
+                 radial-gradient(ellipse at 80% 20%,rgba(139,92,246,0.1) 0%,transparent 50%),
+                 var(--bg);
+      padding:4rem 0;position:relative;overflow:hidden;
+    }
+    .hero::before{
+      content:'';position:absolute;inset:0;
+      background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%232563eb' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events:none;
+    }
+    .container{max-width:960px;margin:0 auto;padding:0 1.5rem;position:relative;z-index:1;}
+
+    .badge{display:inline-flex;align-items:center;gap:.5rem;background:rgba(37,99,235,0.12);border:1px solid rgba(59,130,246,0.3);color:var(--blue2);font-size:.72rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:.3rem 1rem;border-radius:99px;margin-bottom:1.5rem;}
+    .badge-dot{width:6px;height:6px;background:var(--cyan);border-radius:50%;animation:pulse 2s infinite;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+    h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:900;letter-spacing:-1.5px;line-height:1.1;margin-bottom:1rem;}
+    .h1-grad{background:linear-gradient(135deg,#60a5fa,#818cf8,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    .hero-sub{font-size:1rem;color:var(--text2);margin-bottom:2rem;max-width:640px;line-height:1.8;}
+    .hero-sub span{color:var(--blue2);font-weight:600;}
+
+    .hero-meta{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:2.5rem;}
+    .meta-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.28rem .8rem;border-radius:6px;font-size:.75rem;font-weight:600;border:1px solid;}
+    .mc-blue  {background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.3);color:var(--blue2);}
+    .mc-purple{background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.3);color:#a78bfa;}
+    .mc-cyan  {background:rgba(6,182,212,0.1);border-color:rgba(6,182,212,0.3);color:#22d3ee;}
+    .mc-green {background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:#34d399;}
+    .mc-amber {background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:#fbbf24;}
+
+    .hero-links{display:flex;gap:.75rem;flex-wrap:wrap;}
+    .btn{padding:.6rem 1.4rem;border-radius:8px;font-weight:600;font-size:.875rem;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;transition:all .2s;}
+    .btn-primary{background:linear-gradient(135deg,var(--blue3),var(--purple));color:#fff;box-shadow:0 4px 15px rgba(37,99,235,0.3);}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(37,99,235,0.4);}
+    .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+    .btn-ghost:hover{border-color:var(--blue);color:var(--blue2);transform:translateY(-2px);}
+
+    /* SECTIONS */
+    section{padding:5rem 0;}
+    .sec-alt{background:rgba(59,130,246,0.02);}
+    .sec-label{font-size:.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--blue2);margin-bottom:.5rem;}
+    h2{font-size:clamp(1.5rem,3vw,2rem);font-weight:800;letter-spacing:-.5px;margin-bottom:.5rem;}
+    .sec-divider{height:2px;width:48px;background:linear-gradient(90deg,var(--blue),transparent);margin-bottom:2.5rem;border-radius:2px;}
+    .sec-sub{color:var(--text2);font-size:.95rem;max-width:680px;margin-bottom:2rem;line-height:1.8;}
+
+    /* SCHEME CARDS */
+    .scheme-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;}
+    @media(max-width:640px){.scheme-grid{grid-template-columns:1fr;}}
+    .scheme-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.5rem;transition:all .25s;border-left:3px solid;}
+    .scheme-card:hover{transform:translateY(-3px);box-shadow:var(--shadow);}
+    .sc1{border-left-color:var(--blue);}
+    .sc2{border-left-color:var(--cyan);}
+    .sc3{border-left-color:var(--purple);}
+    .sc4{border-left-color:var(--green);}
+    .scheme-num{font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:.5rem;}
+    .s1c{color:var(--blue2);}
+    .s2c{color:#22d3ee;}
+    .s3c{color:#a78bfa;}
+    .s4c{color:#34d399;}
+    .scheme-title{font-size:.95rem;font-weight:800;color:var(--text);margin-bottom:.4rem;}
+    .scheme-desc{font-size:.82rem;color:var(--text2);line-height:1.7;margin-bottom:.8rem;}
+    .scheme-tags{display:flex;flex-wrap:wrap;gap:.4rem;}
+    .stag{font-size:.68rem;font-weight:600;padding:.2rem .55rem;border-radius:4px;background:var(--bg3);border:1px solid var(--border);color:var(--text3);}
+
+    /* PDE CARDS */
+    .pde-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.2rem;}
+    @media(max-width:640px){.pde-grid{grid-template-columns:1fr;}}
+    .pde-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.6rem;}
+    .pde-icon{font-size:1.5rem;margin-bottom:.6rem;}
+    .pde-title{font-size:.92rem;font-weight:800;color:var(--blue2);margin-bottom:.6rem;}
+    .pde-eq{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:#e2e8f0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;margin:.5rem 0;line-height:1.6;}
+    .pde-desc{font-size:.82rem;color:var(--text2);line-height:1.7;}
+
+    /* EXPERIMENTS TABLE */
+    .table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;}
+    thead{background:var(--bg3);}
+    th{padding:.85rem 1rem;text-align:left;font-weight:700;color:var(--blue2);font-size:.72rem;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+    td{padding:.75rem 1rem;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text2);}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(59,130,246,0.04);}
+    td.bold{color:var(--text);font-weight:600;}
+    .tag{display:inline-block;padding:.15rem .55rem;border-radius:4px;font-size:.68rem;font-weight:700;}
+    .tag-green{background:rgba(16,185,129,0.15);color:#34d399;}
+    .tag-amber{background:rgba(245,158,11,0.15);color:#fbbf24;}
+    .tag-red  {background:rgba(239,68,68,0.15);color:#f87171;}
+    .tag-blue {background:rgba(59,130,246,0.15);color:#93c5fd;}
+
+    /* FINDINGS */
+    .findings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1.2rem;}
+    @media(max-width:600px){.findings-grid{grid-template-columns:1fr;}}
+    .finding-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.4rem;border-left:3px solid;transition:all .25s;}
+    .finding-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+    .fc-blue  {border-left-color:var(--blue);}
+    .fc-green {border-left-color:var(--green);}
+    .fc-amber {border-left-color:var(--amber);}
+    .fc-red   {border-left-color:var(--red);}
+    .fc-purple{border-left-color:var(--purple);}
+    .fc-cyan  {border-left-color:var(--cyan);}
+    .fc-label{font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:.5rem;}
+    .finding-title{font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:.4rem;}
+    .finding-desc{font-size:.82rem;color:var(--text2);line-height:1.7;}
+
+    /* PRECISION TABLE */
+    .prec-row-fp64 td{background:rgba(16,185,129,0.05);}
+    .prec-row-fp32 td{background:rgba(245,158,11,0.05);}
+    .prec-row-fp16 td{background:rgba(239,68,68,0.05);}
+
+    /* CODE BLOCK */
+    .code-block{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.4rem 1.6rem;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--text2);line-height:2;overflow-x:auto;}
+    .code-block .cmd{color:#34d399;}
+    .code-block .cmt{color:var(--text3);}
+    .code-block .hl {color:var(--blue2);}
+
+    /* AUTHORS */
+    .authors-row{display:flex;flex-wrap:wrap;gap:1rem;}
+    .author-chip{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.8rem 1.2rem;display:flex;align-items:center;gap:.75rem;}
+    .author-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--blue3),var(--purple));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;color:#fff;flex-shrink:0;}
+    .author-name{font-size:.85rem;font-weight:700;color:var(--text);}
+    .author-sr{font-size:.72rem;color:var(--text3);}
+
+    /* TECH PILLS */
+    .tech-pills{display:flex;flex-wrap:wrap;gap:.6rem;}
+    .pill{padding:.35rem .9rem;border-radius:6px;font-size:.78rem;font-weight:600;background:var(--bg2);border:1px solid var(--border);color:var(--text2);transition:all .2s;}
+    .pill:hover{border-color:var(--blue);color:var(--blue2);}
+    .pill-hl{border-color:rgba(59,130,246,0.3);color:var(--blue2);}
+
+    footer{border-top:1px solid var(--border);padding:2rem 0;text-align:center;color:var(--text3);font-size:.8rem;}
+    footer a{color:var(--blue2);text-decoration:none;}
+    footer a:hover{text-decoration:underline;}
+
+    .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease;}
+    .revealed{opacity:1;transform:none;}
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="badge"><span class="badge-dot"></span>Course Project · DS 289 · IISc Bengaluru</div>
+    <h1><span class="h1-grad">Effect of Floating-Point<br/>Precision on PDE Solvers</span></h1>
+    <p class="hero-sub">
+      How does precision — <span>FP64 vs FP32 vs FP16</span> — affect the accuracy, stability, conservation,
+      and cost of four finite-difference schemes on the
+      <span>Linear Advection-Diffusion</span> and <span>Viscous Burgers'</span> equations?
+    </p>
+    <div class="hero-meta">
+      <span class="meta-chip mc-blue">🔢 4 Schemes</span>
+      <span class="meta-chip mc-cyan">🧪 6 Experiments</span>
+      <span class="meta-chip mc-purple">⚡ FP64 / FP32 / FP16</span>
+      <span class="meta-chip mc-amber">🔥 PyTorch Solvers</span>
+      <span class="meta-chip mc-green">IISc · DS 289 · 2024–25</span>
+    </div>
+    <div class="hero-links">
+      <a href="https://github.com/rajneeshbabu/precision-pde-solvers" class="btn btn-primary" target="_blank">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
+        GitHub Repo
+      </a>
+      <a href="report/Effect_of_Precision_on_PDE_solvers.pdf" class="btn btn-ghost" target="_blank">📄 Report PDF</a>
+      <a href="https://rajneeshbabu.github.io" class="btn btn-ghost" target="_blank">← Portfolio</a>
+    </div>
+  </div>
+</section>
+
+<!-- GOVERNING EQUATIONS -->
+<section class="reveal">
+  <div class="container">
+    <p class="sec-label">Governing Equations</p>
+    <h2>Two Canonical PDEs</h2>
+    <div class="sec-divider"></div>
+    <div class="pde-grid">
+      <div class="pde-card">
+        <div class="pde-icon">🌊</div>
+        <div class="pde-title">Linear Advection-Diffusion</div>
+        <div class="pde-eq">u_t + c·u_x = ν·u_xx<br/>x ∈ [0,1], periodic BCs</div>
+        <div class="pde-desc">Advection speed c = 1, diffusivity ν = 1/Re. Exact solution known: <br/>u(x,t) = A·exp(−νk²t)·sin(k(x−ct)), k = 2πm. Used for ground-truth L2/Linf error measurements.</div>
+      </div>
+      <div class="pde-card">
+        <div class="pde-icon">💥</div>
+        <div class="pde-title">Viscous Burgers' Equation</div>
+        <div class="pde-eq">u_t + (u²/2)_x = ν·u_xx<br/>u₀(x) = sin(2πx), periodic BCs</div>
+        <div class="pde-desc">No closed-form solution for general Re. Reference solution computed via <strong style="color:var(--blue2)">Cole–Hopf spectral method</strong> on a dense N = 8192 grid. FP64 pilot time-step schedule replayed verbatim at FP32/FP16 to isolate precision effects.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCHEMES -->
+<section class="sec-alt reveal">
+  <div class="container">
+    <p class="sec-label">Numerical Schemes</p>
+    <h2>Four Finite-Difference Methods</h2>
+    <div class="sec-divider"></div>
+    <div class="scheme-grid">
+      <div class="scheme-card sc1">
+        <div class="scheme-num s1c">Scheme 1 · 1st Order</div>
+        <div class="scheme-title">Upwind / Godunov + Forward Euler</div>
+        <div class="scheme-desc">First-order upwind for linear advection; Godunov exact Riemann solver for Burgers. Explicit Forward Euler time integration.</div>
+        <div class="scheme-tags">
+          <span class="stag">Godunov Flux</span><span class="stag">Forward Euler</span><span class="stag">O(Δx, Δt)</span>
+        </div>
+      </div>
+      <div class="scheme-card sc2">
+        <div class="scheme-num s2c">Scheme 2 · 1st Order</div>
+        <div class="scheme-title">Lax–Friedrichs / Rusanov + Forward Euler</div>
+        <div class="scheme-desc">Lax–Friedrichs flux for linear advection; Rusanov (local Lax–Friedrichs) for Burgers. More dissipative than Godunov.</div>
+        <div class="scheme-tags">
+          <span class="stag">Rusanov Flux</span><span class="stag">Forward Euler</span><span class="stag">O(Δx, Δt)</span>
+        </div>
+      </div>
+      <div class="scheme-card sc3">
+        <div class="scheme-num s3c">Scheme 3 · 2nd Order</div>
+        <div class="scheme-title">Lax–Wendroff / Richtmyer</div>
+        <div class="scheme-desc">Second-order Lax–Wendroff flux for linear; Richtmyer two-step predictor–corrector for Burgers. Dispersive errors near shocks.</div>
+        <div class="scheme-tags">
+          <span class="stag">Lax-Wendroff</span><span class="stag">Richtmyer</span><span class="stag">O(Δx², Δt²)</span>
+        </div>
+      </div>
+      <div class="scheme-card sc4">
+        <div class="scheme-num s4c">Scheme 4 · 2nd Order</div>
+        <div class="scheme-title">MUSCL + Rusanov + SSP-RK2</div>
+        <div class="scheme-desc">MUSCL slope-limited reconstruction (minmod/mc/vanleer) + Rusanov flux. Strong Stability Preserving RK2 (Shu–Osher) time integration. TVD and ~3× costlier per step than Scheme 1.</div>
+        <div class="scheme-tags">
+          <span class="stag">MUSCL</span><span class="stag">SSP-RK2</span><span class="stag">TVD</span><span class="stag">O(Δx², Δt²)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXPERIMENTS -->
+<section class="reveal">
+  <div class="container">
+    <p class="sec-label">Experiments</p>
+    <h2>Six Stress Tests per Scheme</h2>
+    <div class="sec-divider"></div>
+    <p class="sec-sub">Every scheme runs all six experiments × three precision variants (FP64 / FP32 / FP16), producing a uniform diagnostics dataset for direct cross-scheme comparison.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Experiment</th><th>Purpose</th><th>Grid</th><th>CFL</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold" style="font-family:'JetBrains Mono',monospace;">01</td>
+            <td class="bold">Baseline Regime Sweep</td>
+            <td>Accuracy across Re = 10, 100, 1000</td>
+            <td>nx = 1024</td>
+            <td><span class="tag tag-green">0.80</span></td>
+          </tr>
+          <tr>
+            <td class="bold" style="font-family:'JetBrains Mono',monospace;">02</td>
+            <td class="bold">Ultra-High Re Shock Stress</td>
+            <td>Shock sharpening at Re = 100,000 — precision sensitivity</td>
+            <td>nx = 1024</td>
+            <td><span class="tag tag-green">0.80</span></td>
+          </tr>
+          <tr>
+            <td class="bold" style="font-family:'JetBrains Mono',monospace;">03</td>
+            <td class="bold">Under-Resolved High Re</td>
+            <td>Coarse grid (nx=128) — FP16 breakdown & instability</td>
+            <td>nx = 128</td>
+            <td><span class="tag tag-amber">0.80</span></td>
+          </tr>
+          <tr>
+            <td class="bold" style="font-family:'JetBrains Mono',monospace;">04</td>
+            <td class="bold">Tiny Amplitude Quantization</td>
+            <td>Amplitude 1e-6 — precision floor & lost updates (linear only)</td>
+            <td>nx = 1024</td>
+            <td><span class="tag tag-green">0.80</span></td>
+          </tr>
+          <tr>
+            <td class="bold" style="font-family:'JetBrains Mono',monospace;">05</td>
+            <td class="bold">Long-Horizon Drift</td>
+            <td>Extended time — conservation error & TV drift accumulation</td>
+            <td>nx = 1024</td>
+            <td><span class="tag tag-amber">0.50</span></td>
+          </tr>
+          <tr>
+            <td class="bold" style="font-family:'JetBrains Mono',monospace;">06</td>
+            <td class="bold">CFL Overdrive Failure</td>
+            <td>Intentional CFL = 1.2 — method-level failure mode</td>
+            <td>nx = 256</td>
+            <td><span class="tag tag-red">1.20</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PRECISION COMPARISON -->
+<section class="sec-alt reveal">
+  <div class="container">
+    <p class="sec-label">Precision</p>
+    <h2>FP64 / FP32 / FP16 Variants</h2>
+    <div class="sec-divider"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Precision</th><th>torch.dtype</th><th>Bits</th><th>Mantissa</th><th>Stability (CFL=0.8)</th><th>High Re Accuracy</th><th>Long Horizon</th></tr>
+        </thead>
+        <tbody>
+          <tr class="prec-row-fp64">
+            <td class="bold">FP64</td>
+            <td style="font-family:'JetBrains Mono',monospace;color:#94a3b8;">torch.float64</td>
+            <td>64</td>
+            <td>52 bits</td>
+            <td><span class="tag tag-green">Stable ✓</span></td>
+            <td><span class="tag tag-green">Reference</span></td>
+            <td><span class="tag tag-green">No drift</span></td>
+          </tr>
+          <tr class="prec-row-fp32">
+            <td class="bold">FP32</td>
+            <td style="font-family:'JetBrains Mono',monospace;color:#94a3b8;">torch.float32</td>
+            <td>32</td>
+            <td>23 bits</td>
+            <td><span class="tag tag-green">Stable ✓</span></td>
+            <td><span class="tag tag-amber">Small error</span></td>
+            <td><span class="tag tag-amber">Slow drift</span></td>
+          </tr>
+          <tr class="prec-row-fp16">
+            <td class="bold">FP16</td>
+            <td style="font-family:'JetBrains Mono',monospace;color:#94a3b8;">torch.float16</td>
+            <td>16</td>
+            <td>10 bits</td>
+            <td><span class="tag tag-red">Unstable (exp03)</span></td>
+            <td><span class="tag tag-red">Catastrophic</span></td>
+            <td><span class="tag tag-red">Mass drift</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- KEY FINDINGS -->
+<section class="reveal">
+  <div class="container">
+    <p class="sec-label">Key Findings</p>
+    <h2>What the Experiments Showed</h2>
+    <div class="sec-divider"></div>
+    <div class="findings-grid">
+      <div class="finding-card fc-green">
+        <div class="fc-label" style="color:#34d399;">FP64 — Reference</div>
+        <div class="finding-title">Consistently Lowest Errors</div>
+        <div class="finding-desc">FP64 achieves the lowest L2 and L∞ errors across all four schemes and all six experiments. No stability issues at any tested CFL or Reynolds number.</div>
+      </div>
+      <div class="finding-card fc-amber">
+        <div class="fc-label" style="color:#fbbf24;">FP32 — Practical Sweet Spot</div>
+        <div class="finding-title">Adequate for Most Regimes</div>
+        <div class="finding-desc">FP32 introduces small but measurable errors at Re ≥ 1000 where gradients are steep. Stable at CFL = 0.80 across all schemes. Shows slow mass drift over long time horizons.</div>
+      </div>
+      <div class="finding-card fc-red">
+        <div class="fc-label" style="color:#f87171;">FP16 — Dangerous</div>
+        <div class="finding-title">Catastrophic Cancellation at High Re</div>
+        <div class="finding-desc">FP16's 10-bit mantissa causes catastrophic cancellation in high-Re / tiny-amplitude experiments. Loses stability on under-resolved grids (nx=128, Re=100,000). Not suitable for production solvers.</div>
+      </div>
+      <div class="finding-card fc-blue">
+        <div class="fc-label" style="color:var(--blue2);">Scheme 4 (MUSCL + SSP-RK2)</div>
+        <div class="finding-title">Best Accuracy, TVD Preserved</div>
+        <div class="finding-desc">MUSCL with minmod limiter maintains Total Variation Diminishing (TVD) behaviour even at FP32. ~3× costlier per cell per step than Scheme 1, but substantially higher accuracy per grid point.</div>
+      </div>
+      <div class="finding-card fc-purple">
+        <div class="fc-label" style="color:#a78bfa;">Scheme 3 (Lax–Wendroff)</div>
+        <div class="finding-title">Dispersive Errors Near Shocks</div>
+        <div class="finding-desc">Lax–Wendroff exhibits slight TV growth near shocks due to its dispersive error character — even at FP64. FP16 amplifies these oscillations significantly.</div>
+      </div>
+      <div class="finding-card fc-cyan">
+        <div class="fc-label" style="color:#22d3ee;">Conservation</div>
+        <div class="finding-title">FP16 Mass Drift Over Time</div>
+        <div class="finding-desc">Schemes 1 & 2 are dissipative — TV decreases monotonically. FP16 amplifies mass drift noticeably over long time horizons (exp05). First-order schemes + FP16 = worst conservation.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO RUN -->
+<section class="sec-alt reveal">
+  <div class="container">
+    <p class="sec-label">Run Locally</p>
+    <h2>Getting Started</h2>
+    <div class="sec-divider"></div>
+    <div class="code-block">
+<span class="cmt"># 1. Clone and install</span>
+<span class="cmd">git clone</span> <span class="hl">https://github.com/rajneeshbabu/precision-pde-solvers.git</span>
+<span class="cmd">cd</span> precision-pde-solvers
+<span class="cmd">pip install</span> -r requirements.txt
+
+<span class="cmt"># 2. Open any scheme notebook (each is self-contained)</span>
+<span class="cmd">jupyter notebook</span> <span class="hl">"scheme1/scheme1(Godunov+Forward_Euler).ipynb"</span>
+<span class="cmd">jupyter notebook</span> <span class="hl">"scheme2/scheme2(Lax-Friedrichs_Rusanov+Forward_Euler).ipynb"</span>
+<span class="cmd">jupyter notebook</span> <span class="hl">"scheme3/scheme3(Lax-Wendroff).ipynb"</span>
+<span class="cmd">jupyter notebook</span> <span class="hl">"scheme4/scheme4_MUSCL_Rusanov_SSPRK2.ipynb"</span>
+
+<span class="cmt"># 3. Run all cells top-to-bottom — last cell executes all 6 experiments</span>
+<span class="cmt"># Results (CSVs + figures) saved in the scheme folder automatically</span>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section class="reveal">
+  <div class="container">
+    <p class="sec-label">Tech Stack</p>
+    <h2>Libraries &amp; Tools</h2>
+    <div class="sec-divider"></div>
+    <div class="tech-pills">
+      <span class="pill pill-hl">Python 3.10+</span>
+      <span class="pill pill-hl">PyTorch 2.0+</span>
+      <span class="pill pill-hl">NumPy</span>
+      <span class="pill">SciPy</span>
+      <span class="pill">Pandas</span>
+      <span class="pill">Matplotlib</span>
+      <span class="pill">Jupyter Notebook</span>
+    </div>
+  </div>
+</section>
+
+<!-- AUTHORS -->
+<section class="sec-alt reveal">
+  <div class="container">
+    <p class="sec-label">Team</p>
+    <h2>Authors</h2>
+    <div class="sec-divider"></div>
+    <div class="authors-row">
+      <div class="author-chip">
+        <div class="author-avatar">NB</div>
+        <div><div class="author-name">Nishchith C. Bharadwaj</div><div class="author-sr">SR No. 26650 · IISc CDS</div></div>
+      </div>
+      <div class="author-chip">
+        <div class="author-avatar">DY</div>
+        <div><div class="author-name">Dhruv Yadav</div><div class="author-sr">SR No. 26641 · IISc CDS</div></div>
+      </div>
+      <div class="author-chip">
+        <div class="author-avatar">RB</div>
+        <div><div class="author-name">Rajneesh Babu</div><div class="author-sr">SR No. 26058 · IISc CDS</div></div>
+      </div>
+    </div>
+    <p style="margin-top:1.5rem;font-size:.85rem;color:var(--text3);">M.Tech Computational and Data Sciences · Indian Institute of Science · Bengaluru · 2024–25</p>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>
+      <a href="https://rajneeshbabu.github.io">Rajneesh Babu</a> ·
+      Nishchith C. Bharadwaj · Dhruv Yadav ·
+      IISc Bengaluru · 2025
+    </p>
+  </div>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver(
+    entries => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('revealed'); }),
+    { threshold: 0.1 }
+  );
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
